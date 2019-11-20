@@ -1,4 +1,4 @@
-from flask import Blueprint, redirect, render_template, request, jsonify
+from flask import Blueprint, request, jsonify
 from monolith.database import db, Followers, User
 from flask_login import current_user, login_required
 from sqlalchemy import and_
@@ -42,39 +42,37 @@ def unfollow_user(userid):
     subject = current_user.id
 
     if userid == subject:
-        return redirect('/wall/'+str(subject))
+        return {"followed": -2, "message": "You can't self-unfollow"}
 
     # if the followed user do not exist
     if User.query.filter_by(id=userid).first() == None:
-        return redirect('/stories')
+        return {"followed": -3, "message": "The user does not exist"}
 
     # if user not followed
-    if not _is_follower(subject, userid):
-        return redirect('/wall/'+str(userid))
+    if not is_follower(subject, userid):
+        return {"followed": -1, "message": "You do not already follow this user"}
 
     # remove from follower_table the tuple (follower_id, followed_id)
-    if _delete_follow(subject, userid) == -1:
+    if delete_follow(subject, userid) == -1:
         # db delete error
-        return redirect('/wall/'+str(userid))
+        rereturn {"followed": -4, "message": "DB error during add_follow"}
 
     # return OK
-    return redirect('/wall/'+str(userid))
+    return {"followed": get_followed_number(subject)}
 
 
 @follow.route('/unfollow/<int:userid>', methods=['POST'])
 @login_required
 def unfollow_user_post(userid):
     # Unfollow user API as POST to be compatible with forms
-    return _unfollow_user(userid)
+    return unfollow_user(userid)
 
 
 # TODO: add to the API doc
 # return the followers list
-@follow.route('/followers/list', methods=['GET'])
+@follow.route('/followers/list/<int:subject>', methods=['GET'])
 @login_required
-def followers_list():
-    subject = current_user.id
-
+def followers_list(subject):
     temp = db.session.query(Followers, User).filter(
         Followers.follower_id == User.id).filter_by(followed_id=subject).all()
     followers = []
@@ -84,16 +82,16 @@ def followers_list():
              "lastname": f[1].lastname}
         followers.append(d)
 
-    # return jsonify({"followers": followers})
+    return jsonify({"followers": followers})
 
-    return render_template("follower.html", followers=followers, wall_url="/wall")
-
-# TODO: add to the API doc
-# Return the followed list
-@follow.route('/followed/list', methods=['GET'])
+@follow.route('/followers/list', methods=['GET'])
 @login_required
-def followed_list():
-    subject = current_user.id
+def followers_list_cu():
+    return followed_list(current_user.id)
+
+@follow.route('/followed/list/<int:subject>', methods=['GET'])
+@login_required
+def followed_list(subject):
     temp = db.session.query(Followers, User).filter(
         Followers.followed_id == User.id).filter_by(follower_id=subject).all()
     followed = []
@@ -105,28 +103,36 @@ def followed_list():
 
     return jsonify({"followed": followed})
 
+# TODO: add to the API doc
+# Return the followed list
+@follow.route('/followed/list', methods=['GET'])
+@login_required
+def followed_list_cu():
+    return followed_list(current_user.id)
 
 # TODO: add to API doc
 # return number of followers
+@follow.route('/followers/<int:userid>', methods=['GET'])
+@login_required
+def followers_numer(userid):
+    return jsonify({"followers": get_followers_number(userid)})
+
 @follow.route('/followers', methods=['GET'])
 @login_required
-def followers_numer():
-    # return json with OK, and the number
-    subject = current_user.id
-    temp = db.session.query(Followers, User).filter(
-        Followers.follower_id == User.id).filter_by(followed_id=subject).all()
-    return jsonify({"followers_num": len(temp)})
-
+def followers_numer_cu():
+    return followers_numer(current_user.id)
 
 # TODO: add to API doc
 # return number of followers
+@follow.route('/followed/<int:userid>', methods=['GET'])
+@login_required
+def followed_numer(userid):
+    return jsonify({"followeds": get_followed_number(userid)})
+
 @follow.route('/followed', methods=['GET'])
 @login_required
-def followed_numer():
-    subject = current_user.id
-    temp = db.session.query(Followers, User).filter(
-        Followers.followed_id == User.id).filter_by(follower_id=subject).all()
-    return jsonify({"followed_num": len(temp)})
+def followed_numer_cu():
+    return followed_numer(current_user.id)
 
 
 # =============================================================================
@@ -189,7 +195,6 @@ def delete_follow(user_a, user_b):
     try:
         item = Followers.query.filter_by(
             follower_id=user_a, followed_id=user_b).first()
-        print(item)
         db.session.delete(item)
         db.session.commit()
         return 1
