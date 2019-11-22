@@ -31,7 +31,7 @@ def follow_user(userid):
         return {"followed": -4, "message": "DB error during add_follow"}
 
     # return OK + number of users followed
-    return {"followed": get_followed_number(subject)}
+    return {"followed": get_followed_number(subject), "message": "OK"}
 
 
 # Unfollow a writer
@@ -120,7 +120,7 @@ def followers_numer(userid):
 @follow.route('/followers', methods=['GET'])
 @login_required
 def followers_numer_cu():
-    return followers_numer(current_user.id)
+    return followers_numer(currentu_ser.id)
 
 # TODO: add to API doc
 # return number of followers
@@ -133,6 +133,18 @@ def followed_numer(userid):
 @login_required
 def followed_numer_cu():
     return followed_numer(current_user.id)
+
+
+@follow.route('/is_follower/<user_a>/<user_b>', methods=['GET'])
+def get_is_follower(user_a, user_b):
+    """check if user_a follow user_b"""
+    return jsonify({'follow': is_follower(user_a, user_b)})
+
+
+@follow.route('/is_followed/<user_a>/<user_b>', methods=['GET'])
+def get_is_followed(user_a, user_b):
+    """check if user_a is followed by user_b"""
+    return jsonify({'follow': is_follower(user_b, user_a)})
 
 
 # =============================================================================
@@ -152,15 +164,12 @@ def get_followed_by(user_id):
 
 # Get the number of followers
 def get_followers_number(user_id):
-    return len(_get_followed_by(user_id))
+    return len(get_followed_by(user_id))
 
 
 # Get the number of followed
 def get_followed_number(user_id):
     return len(get_followers_of(user_id))
-
-# check if user_a follow user_b
-
 
 def is_follower(user_a, user_b):
     """check if user_a follow user_b"""
@@ -170,7 +179,6 @@ def is_follower(user_a, user_b):
         return False
     else:
         return True
-
 
 def create_follow(user_a, user_b):
     item = Followers()
@@ -182,7 +190,7 @@ def create_follow(user_a, user_b):
 # TODO: use celerity
 def add_follow(user_a, user_b):
     try:
-        db.session.add(_create_follow(user_a, user_b))
+        db.session.add(create_follow(user_a, user_b))
         db.session.commit()
         return 1
     except:
