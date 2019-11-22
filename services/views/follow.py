@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from monolith.database import db, Followers, User
+from services.database import db, Followers, User
 from flask_login import current_user, login_required
 from sqlalchemy import and_
 
